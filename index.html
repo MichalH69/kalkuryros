@@ -26,7 +26,7 @@ body {
 /* PAGES */
 .page { display:none; padding:20px 16px 0; max-width:480px; margin:0 auto; }
 .page.active { display:block; }
-h1 { font-size:1.2rem; font-weight:700; color:#fff; margin-bottom:18px; }
+h1 { font-size:1.2rem; font-weight:700; color:#fff; margin-bottom:18px; padding-right:50px; }
 h2 { font-size:0.85rem; font-weight:600; color:#6b7280; margin:20px 0 8px; text-transform:uppercase; letter-spacing:.06em; }
 /* CARD */
 .card { background:#1a1d24; border-radius:14px; padding:18px; margin-bottom:14px; }
@@ -179,11 +179,22 @@ svg.chart { display:block; }
 .ob-btn { padding:12px 28px; border-radius:12px; border:none; font-size:0.95rem; font-weight:700; cursor:pointer; }
 .ob-btn-primary { background:var(--clr-primary); color:#fff; }
 .ob-btn-secondary { background:#22252e; color:#6b7280; }
+/* AVATAR BUTTON */
+.avatar-btn { position:fixed; top:14px; right:16px; width:38px; height:38px; border-radius:50%; border:2px solid #2a2d37; background:#22252e; cursor:pointer; z-index:90; overflow:hidden; padding:0; display:flex; align-items:center; justify-content:center; transition:.15s; }
+.avatar-btn:hover { border-color:var(--clr-primary); }
+/* PROFILE MODAL */
+.profile-photo-wrap { width:90px; height:90px; border-radius:50%; background:#22252e; border:2px solid #2a2d37; margin:0 auto 8px; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer; transition:.15s; }
+.profile-photo-wrap:hover { border-color:var(--clr-primary); }
 </style>
 </head>
 <body>
 
 <div class="toast" id="toast"></div>
+
+<button class="avatar-btn" id="avatar-btn" onclick="openProfileModal()">
+  <span id="avatar-default"><svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
+  <img id="avatar-img" style="display:none;width:100%;height:100%;object-fit:cover;">
+</button>
 
 <!-- CONFIRMATION DIALOG -->
 <div class="confirm-overlay" id="confirm-overlay">
@@ -460,6 +471,28 @@ svg.chart { display:block; }
   </div>
 </div>
 
+<!-- MODAL PROFILE -->
+<div class="modal-overlay" id="modal-profile">
+  <div class="modal">
+    <h3>👤 Profil</h3>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div class="profile-photo-wrap" id="profile-photo-preview" onclick="document.getElementById('profile-photo-input').click()">
+        <span id="profile-photo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#4a5060" stroke-width="2" width="36" height="36"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
+        <img id="profile-photo-img" style="display:none;width:100%;height:100%;object-fit:cover;">
+      </div>
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:4px;">Klepni pro změnu fotky</div>
+      <button id="btn-remove-photo" style="display:none;background:none;border:none;color:#f87171;font-size:0.75rem;cursor:pointer;" onclick="removeProfilePhoto()">Odebrat fotku</button>
+      <input type="file" id="profile-photo-input" accept="image/*" style="display:none">
+    </div>
+    <label class="field-label">Jméno</label>
+    <input type="text" id="profile-name-input" placeholder="Tvoje jméno" maxlength="30">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-profile-cancel" style="flex:1;">Zrušit</button>
+      <button class="btn btn-primary" id="btn-profile-save" style="flex:1;">Uložit</button>
+    </div>
+  </div>
+</div>
+
 <!-- NAV -->
 <nav class="nav">
   <button class="nav-btn active" data-page="calc"><span class="icon">🧮</span>Kalkulačka</button>
@@ -573,6 +606,81 @@ async function deleteFromCloud(date) {
   if (!currentUser) return;
   try { await db.collection(`users/${currentUser.uid}/diary`).doc(date).delete(); } catch(e) {}
 }
+
+// ══════════════════════════════════════════════════════
+//  PROFILE
+// ══════════════════════════════════════════════════════
+const PROFILE_KEY = 'rozvoz_profile';
+let profilePhotoTemp = null;
+
+function loadProfile() { try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || {}; } catch { return {}; } }
+function saveProfile(p) { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); }
+
+function renderAvatar() {
+  const profile = loadProfile();
+  const avatarImg     = document.getElementById('avatar-img');
+  const avatarDefault = document.getElementById('avatar-default');
+  if (profile.photo) {
+    avatarImg.src = profile.photo;
+    avatarImg.style.display = '';
+    avatarDefault.style.display = 'none';
+  } else {
+    avatarImg.style.display = 'none';
+    avatarDefault.style.display = '';
+  }
+}
+
+function openProfileModal() {
+  const profile = loadProfile();
+  profilePhotoTemp = profile.photo || null;
+  document.getElementById('profile-name-input').value = profile.name || '';
+  updateProfilePhotoPreview();
+  document.getElementById('modal-profile').classList.add('open');
+}
+
+function updateProfilePhotoPreview() {
+  const img       = document.getElementById('profile-photo-img');
+  const icon      = document.getElementById('profile-photo-icon');
+  const removeBtn = document.getElementById('btn-remove-photo');
+  if (profilePhotoTemp) {
+    img.src = profilePhotoTemp; img.style.display = ''; icon.style.display = 'none'; removeBtn.style.display = '';
+  } else {
+    img.style.display = 'none'; icon.style.display = ''; removeBtn.style.display = 'none';
+  }
+}
+
+function removeProfilePhoto() { profilePhotoTemp = null; updateProfilePhotoPreview(); }
+
+document.getElementById('profile-photo-input').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const max = 200;
+      let w = img.width, h = img.height;
+      if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      profilePhotoTemp = canvas.toDataURL('image/jpeg', 0.85);
+      updateProfilePhotoPreview();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file); e.target.value = '';
+});
+
+document.getElementById('btn-profile-cancel').addEventListener('click', () => {
+  document.getElementById('modal-profile').classList.remove('open'); profilePhotoTemp = null;
+});
+document.getElementById('btn-profile-save').addEventListener('click', () => {
+  const name = document.getElementById('profile-name-input').value.trim();
+  saveProfile({ name, photo: profilePhotoTemp });
+  renderAvatar();
+  document.getElementById('modal-profile').classList.remove('open');
+  showToast('✅ Profil uložen');
+});
 
 const THEMES = {
   wolt:    { primary:'#4f8cff', accent:'#3d7aed' },
@@ -1344,6 +1452,7 @@ editPlatCtrl = initPlatBtns('edit-platform-btns', savedTheme, false);
 applyTheme(savedTheme);
 calculate();
 checkBackupWarning();
+renderAvatar();
 initOnboarding();
 </script>
 </body>
