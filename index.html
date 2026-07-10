@@ -301,10 +301,6 @@ svg.chart { display:block; }
         <button class="preset-btn active" data-value="9.5">🏙 Rozvoz (9,5)</button>
         <button class="preset-btn" data-value="6.5">🛣 Mimo město (6,5)</button>
       </div>
-      <label class="checkbox-row">
-        <input type="checkbox" id="desna-check" checked>
-        <span>Připočítat Desná – Liberec a zpět (~50 km, 6,5 l/100km)</span>
-      </label>
     </div>
     <div id="fields-liters" style="display:none;">
       <label class="field-label" for="direct-liters">Spálené litry (l)</label>
@@ -403,6 +399,17 @@ svg.chart { display:block; }
       <button class="btn btn-secondary" onclick="signOutGoogle()">🚪 Odhlásit se</button>
     </div>
   </div>
+  <h2>Cesta z domu</h2>
+  <div class="card">
+    <label class="checkbox-row" style="margin-top:0;">
+      <input type="checkbox" id="home-route-toggle">
+      <span>Připočítat cestu z domu a zpátky</span>
+    </label>
+    <div id="home-route-info" style="display:none;margin-top:12px;border-top:1px solid #2a2d37;padding-top:12px;">
+      <div id="home-route-desc" style="font-size:0.83rem;color:#a0a4ad;margin-bottom:10px;"></div>
+      <button class="btn btn-secondary btn-sm" onclick="openHomeRouteModal()">✏️ Upravit trasu</button>
+    </div>
+  </div>
   <h2>Nebezpečná zóna</h2>
   <div class="card">
     <button class="btn btn-danger" id="btn-clear">🗑 Smazat všechna data</button>
@@ -467,6 +474,23 @@ svg.chart { display:block; }
     <div class="modal-actions">
       <button class="btn btn-secondary" id="btn-preset-cancel" style="flex:1;">Zrušit</button>
       <button class="btn btn-primary" id="btn-preset-save" style="flex:1;">Přidat</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HOME ROUTE -->
+<div class="modal-overlay" id="modal-home-route">
+  <div class="modal">
+    <h3>🏠 Cesta z domu</h3>
+    <label class="field-label">Název trasy</label>
+    <input type="text" id="home-route-name" placeholder="např. Desná – Liberec" maxlength="40">
+    <label class="field-label">Vzdálenost tam a zpět (km)</label>
+    <input type="number" id="home-route-km" step="0.1" placeholder="např. 50" inputmode="decimal">
+    <label class="field-label">Spotřeba (l/100 km)</label>
+    <input type="number" id="home-route-cons" step="0.1" placeholder="např. 6.5" inputmode="decimal">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-home-route-cancel" style="flex:1;">Zrušit</button>
+      <button class="btn btn-primary" id="btn-home-route-save" style="flex:1;">Uložit</button>
     </div>
   </div>
 </div>
@@ -682,6 +706,73 @@ document.getElementById('btn-profile-save').addEventListener('click', () => {
   showToast('✅ Profil uložen');
 });
 
+// ══════════════════════════════════════════════════════
+//  HOME ROUTE
+// ══════════════════════════════════════════════════════
+const HOME_ROUTE_KEY = 'rozvoz_home_route';
+
+function loadHomeRoute() {
+  try { return JSON.parse(localStorage.getItem(HOME_ROUTE_KEY)) || { enabled:false, name:'', km:0, consumption:6.5 }; }
+  catch { return { enabled:false, name:'', km:0, consumption:6.5 }; }
+}
+function saveHomeRoute(r) { localStorage.setItem(HOME_ROUTE_KEY, JSON.stringify(r)); }
+
+function renderHomeRouteSettings() {
+  const route  = loadHomeRoute();
+  const toggle = document.getElementById('home-route-toggle');
+  const info   = document.getElementById('home-route-info');
+  const desc   = document.getElementById('home-route-desc');
+  if (!toggle) return;
+  toggle.checked = route.enabled;
+  if (route.enabled && route.km > 0) {
+    info.style.display = '';
+    desc.textContent = `${route.name||'Cesta z domu'}: ${route.km} km tam a zpět, ${route.consumption} l/100 km`;
+  } else if (route.enabled) {
+    info.style.display = '';
+    desc.textContent = 'Trasa není nastavena — klepni pro přidání.';
+  } else {
+    info.style.display = 'none';
+  }
+}
+
+function openHomeRouteModal() {
+  const route = loadHomeRoute();
+  document.getElementById('home-route-name').value = route.name || '';
+  document.getElementById('home-route-km').value   = route.km   || '';
+  document.getElementById('home-route-cons').value = route.consumption || 6.5;
+  document.getElementById('modal-home-route').classList.add('open');
+}
+
+document.getElementById('home-route-toggle').addEventListener('change', e => {
+  const route = loadHomeRoute();
+  route.enabled = e.target.checked;
+  saveHomeRoute(route);
+  renderHomeRouteSettings();
+  if (e.target.checked && !route.km) openHomeRouteModal();
+  calculate();
+});
+
+document.getElementById('btn-home-route-cancel').addEventListener('click', () => {
+  document.getElementById('modal-home-route').classList.remove('open');
+  const route = loadHomeRoute();
+  if (!route.km) { route.enabled = false; saveHomeRoute(route); renderHomeRouteSettings(); }
+});
+
+document.getElementById('btn-home-route-save').addEventListener('click', () => {
+  const name = document.getElementById('home-route-name').value.trim();
+  const km   = parseFloat(document.getElementById('home-route-km').value);
+  const cons = parseFloat(document.getElementById('home-route-cons').value);
+  if (!km || km <= 0)   { showToast('Zadej počet km', true); return; }
+  if (!cons || cons <=0){ showToast('Zadej spotřebu', true); return; }
+  const route = loadHomeRoute();
+  route.name = name; route.km = km; route.consumption = cons;
+  saveHomeRoute(route);
+  document.getElementById('modal-home-route').classList.remove('open');
+  renderHomeRouteSettings();
+  calculate();
+  showToast('✅ Trasa uložena');
+});
+
 const THEMES = {
   wolt:    { primary:'#4f8cff', accent:'#3d7aed' },
   bolt:    { primary:'#34d399', accent:'#059669' },
@@ -701,15 +792,27 @@ function retrofitData() {
   const data = loadData();
   let changed = false;
   data.forEach(e => {
-    if (e.retrofitted || e.kmCity !== undefined) return;
-    if (e.date >= RETROFIT_DATE) return;
-    const totalLiters = (e.fuelCost || 0) / 36.5;
-    const desnaLiters = (50 / 100) * 6.5;
-    const cityLiters  = Math.max(0, totalLiters - desnaLiters);
-    e.kmCity      = parseFloat(((cityLiters / 9.5) * 100).toFixed(1));
-    e.platform    = 'bolt';
-    e.retrofitted = true;
-    changed = true;
+    if (!e.retrofitted && e.kmCity === undefined && e.date < RETROFIT_DATE) {
+      const totalLiters = (e.fuelCost || 0) / 36.5;
+      const desnaLiters = (50 / 100) * 6.5;
+      const cityLiters  = Math.max(0, totalLiters - desnaLiters);
+      e.kmCity      = parseFloat(((cityLiters / 9.5) * 100).toFixed(1));
+      e.platform    = 'bolt';
+      e.retrofitted = true;
+      changed = true;
+    }
+    if (e.fuelPrice === undefined) {
+      e.fuelPrice = 36.5;
+      changed = true;
+    }
+    if (e.liters === undefined) {
+      e.liters = parseFloat(((e.fuelCost || 0) / 36.5).toFixed(2));
+      changed = true;
+    }
+    if (e.homeCost === undefined) {
+      e.homeCost = e.retrofitted ? parseFloat(((50/100)*6.5*36.5).toFixed(2)) : 0;
+      changed = true;
+    }
   });
   if (changed) saveData(data);
 }
@@ -817,7 +920,6 @@ const fuelDispEl     = document.getElementById('fuel-price-display');
 const distanceEl     = document.getElementById('distance');
 const consumptionEl  = document.getElementById('consumption');
 const directLitersEl = document.getElementById('direct-liters');
-const desnaCheck     = document.getElementById('desna-check');
 const resultTotalEl  = document.getElementById('result-total');
 const resultDetailEl = document.getElementById('result-detail');
 const btnLog         = document.getElementById('btn-log');
@@ -825,7 +927,6 @@ const logDateEl      = document.getElementById('log-date');
 const logEarningsEl  = document.getElementById('log-earnings');
 const logKmEl        = document.getElementById('log-km');
 
-const DESNA_KM = 50, DESNA_CONS = 6.5;
 let calcMode = 'km';
 let calcResult = null;
 let logPlatCtrl, editPlatCtrl;
@@ -867,26 +968,27 @@ function calculate() {
     const detail = `${liters.toFixed(2)} l × ${price.toFixed(1)} Kč/l`;
     resultTotalEl.textContent = fmtKc(totalCost);
     resultDetailEl.textContent = detail;
-    calcResult = { totalCost, detail, kmCity: 0 };
+    calcResult = { totalCost, homeCost:0, fuelPrice:price, liters, detail, kmCity: 0 };
     btnLog.disabled = false; return;
   }
   const dist = parseFloat(distanceEl.value)||0;
   const cons  = parseFloat(consumptionEl.value);
-  const withDesna = desnaCheck.checked;
   if (isNaN(price)||isNaN(cons)) { reset(); return; }
+  const route       = loadHomeRoute();
+  const homeActive  = route.enabled && route.km > 0;
   const baseLiters  = (dist/100)*cons;
   const baseCost    = baseLiters*price;
-  const desnaLiters = withDesna ? (DESNA_KM/100)*DESNA_CONS : 0;
-  const desnaCost   = desnaLiters*price;
-  const totalLiters = baseLiters+desnaLiters;
-  const totalCost   = baseCost+desnaCost;
-  const totalKm     = dist+(withDesna?DESNA_KM:0);
+  const homeLiters  = homeActive ? (route.km/100)*route.consumption : 0;
+  const homeCostVal = homeLiters*price;
+  const totalLiters = baseLiters+homeLiters;
+  const totalCost   = baseCost+homeCostVal;
+  const totalKm     = dist+(homeActive?route.km:0);
   resultTotalEl.textContent = fmtKc(totalCost);
   let detail = `Spotřeba: ${totalLiters.toFixed(2)} l / ${totalKm} km`;
-  if (withDesna && dist>0) detail += ` (${dist} km rozvoz + ${DESNA_KM} km Desná–Liberec)`;
-  else if (withDesna) detail += ` (${DESNA_KM} km Desná–Liberec)`;
+  if (homeActive && dist>0) detail += ` (${dist} km rozvoz + ${route.km} km ${route.name||'cesta z domu'})`;
+  else if (homeActive) detail += ` (${route.km} km ${route.name||'cesta z domu'})`;
   resultDetailEl.textContent = detail;
-  calcResult = { totalCost, detail, kmCity: dist };
+  calcResult = { totalCost, homeCost:homeCostVal, fuelPrice:price, liters:totalLiters, detail, kmCity: dist };
   logKmEl.value = dist || '';
   btnLog.disabled = false;
 }
@@ -963,7 +1065,6 @@ document.getElementById('btn-preset-save').addEventListener('click',()=>{
 document.querySelectorAll('.preset-btn').forEach(btn => attachPresetBtn(btn));
 renderPresets();
 [distanceEl, consumptionEl, directLitersEl].forEach(el => el.addEventListener('input', calculate));
-desnaCheck.addEventListener('change', calculate);
 
 // LOG
 btnLog.addEventListener('click', () => {
@@ -980,7 +1081,10 @@ btnLog.addEventListener('click', () => {
   const platform = logPlatCtrl.get();
   const entry = {
     date, earnings,
-    fuelCost: parseFloat(calcResult.totalCost.toFixed(2)),
+    fuelCost:  parseFloat(calcResult.totalCost.toFixed(2)),
+    homeCost:  parseFloat((calcResult.homeCost||0).toFixed(2)),
+    fuelPrice: calcResult.fuelPrice||0,
+    liters:    parseFloat((calcResult.liters||0).toFixed(2)),
     detail: calcResult.detail,
     startTime: startT, endTime: endT,
     kmCity, platform,
@@ -1087,6 +1191,9 @@ function buildDayCard(entry) {
       <div class="detail-row"><span>💰 Výdělek/hod</span><span>${fmtKc(eph)}</span></div>
       ` : `<div class="detail-row"><span>⏱ Čas práce</span><span style="color:#4a5060;">nezadán</span></div>`}
       <div class="detail-row"><span>🛣 Nájezd ve městě</span><span>${entry.kmCity ? entry.kmCity+' km' : '–'}</span></div>
+      ${entry.homeCost > 0 ? `<div class="detail-row"><span>🏠 Cesta z domu</span><span>-${fmtKc(entry.homeCost)}</span></div>` : ''}
+      ${entry.fuelPrice ? `<div class="detail-row"><span>⛽ Cena PHM</span><span>${entry.fuelPrice.toFixed(1).replace('.',',')} Kč/l</span></div>` : ''}
+      ${entry.liters ? `<div class="detail-row"><span>🪣 Spáleno</span><span>${entry.liters.toFixed(2).replace('.',',')} l</span></div>` : ''}
       ${entry.note ? `<div class="detail-row"><span>📝 Poznámka</span><span>${entry.note}</span></div>` : ''}
       ${entry.retrofitted ? `<div class="detail-row"><span>🔄 Data</span><span style="color:#4a5060;">retrofitováno</span></div>` : ''}
       <div class="detail-actions">
@@ -1371,6 +1478,7 @@ function renderSettings() {
     ? `Poslední záloha: ${lb.toLocaleString('cs-CZ')}`
     : 'Žádná záloha dosud nebyla exportována.';
   updateAuthUI();
+  renderHomeRouteSettings();
 }
 
 function checkBackupWarning() {
