@@ -382,6 +382,16 @@ svg.chart { display:block; }
     <button class="btn btn-secondary" id="btn-import" style="margin-top:8px;">📥 Importovat zálohu</button>
     <input type="file" id="file-import" accept=".json" style="display:none;">
   </div>
+  <h2>Cloudová synchronizace</h2>
+  <div class="card">
+    <div id="auth-status" style="font-size:0.83rem;color:#7a7f8a;margin-bottom:12px;">Načítám stav přihlášení...</div>
+    <button class="btn btn-secondary" id="btn-signin" onclick="signInGoogle()" style="display:none">🔐 Přihlásit se přes Google</button>
+    <div id="auth-user" style="display:none">
+      <div id="auth-email" style="font-size:0.8rem;color:#a0a4ad;margin-bottom:10px;"></div>
+      <button class="btn btn-secondary" onclick="syncFromCloud(true)" style="margin-bottom:8px;">🔄 Synchronizovat nyní</button>
+      <button class="btn btn-secondary" onclick="signOutGoogle()">🚪 Odhlásit se</button>
+    </div>
+  </div>
   <h2>Nebezpečná zóna</h2>
   <div class="card">
     <button class="btn btn-danger" id="btn-clear">🗑 Smazat všechna data</button>
@@ -458,6 +468,9 @@ svg.chart { display:block; }
   <button class="nav-btn" data-page="settings"><span class="icon">⚙️</span>Nastavení</button>
 </nav>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
 // ══════════════════════════════════════════════════════
 //  CONSTANTS & STORAGE
@@ -469,6 +482,98 @@ const ONBOARD_KEY   = 'rozvoz_seen_v2026002';
 const BACKUP_DAYS   = 7;
 const RETROFIT_DATE = '2026-07-05';
 
+// ══════════════════════════════════════════════════════
+//  FIREBASE
+// ══════════════════════════════════════════════════════
+firebase.initializeApp({
+  apiKey: "AIzaSyAZknmu5SesAsTZTKyJdU8FKa6SbRx-Pgo",
+  authDomain: "kalkuryros.firebaseapp.com",
+  projectId: "kalkuryros",
+  storageBucket: "kalkuryros.firebasestorage.app",
+  messagingSenderId: "844579054944",
+  appId: "1:844579054944:web:90b113dd0a317bec0d6a05"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+db.enablePersistence().catch(() => {});
+
+let currentUser = null;
+
+auth.onAuthStateChanged(async user => {
+  currentUser = user;
+  updateAuthUI();
+  if (user) await syncFromCloud(false);
+});
+
+function signInGoogle() {
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    .catch(() => showToast('Přihlášení selhalo', true));
+}
+
+function signOutGoogle() {
+  if (!confirm('Odhlásit se? Data zůstanou uložena místně.')) return;
+  auth.signOut();
+}
+
+function updateAuthUI() {
+  const statusEl = document.getElementById('auth-status');
+  const signinBtn = document.getElementById('btn-signin');
+  const authUser  = document.getElementById('auth-user');
+  const emailEl   = document.getElementById('auth-email');
+  if (!statusEl) return;
+  if (currentUser) {
+    statusEl.textContent = 'Přihlášen — data se automaticky synchronizují.';
+    signinBtn.style.display = 'none';
+    authUser.style.display = '';
+    emailEl.textContent = currentUser.email;
+  } else {
+    statusEl.textContent = 'Nejsi přihlášen. Data se ukládají jen v tomto prohlížeči.';
+    signinBtn.style.display = '';
+    authUser.style.display = 'none';
+  }
+}
+
+async function syncFromCloud(manual) {
+  if (!currentUser) return;
+  try {
+    const snapshot = await db.collection(`users/${currentUser.uid}/diary`).get();
+    const cloudEntries = snapshot.docs.map(d => d.data());
+    const localEntries = loadData();
+    const map = {};
+    localEntries.forEach(e => { map[e.date] = e; });
+    cloudEntries.forEach(e => {
+      if (!map[e.date] || (e.loggedAt || '') > (map[e.date].loggedAt || '')) map[e.date] = e;
+    });
+    const merged = Object.values(map).sort((a,b) => b.date.localeCompare(a.date));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    const batch = db.batch();
+    let hasNew = false;
+    localEntries.forEach(e => {
+      if (!cloudEntries.find(c => c.date === e.date)) {
+        batch.set(db.collection(`users/${currentUser.uid}/diary`).doc(e.date), e);
+        hasNew = true;
+      }
+    });
+    if (hasNew) await batch.commit();
+    if (manual) showToast('☁️ Synchronizace dokončena');
+    renderDiary();
+  } catch(e) { showToast('Sync selhal: ' + e.message, true); }
+}
+
+async function saveToCloud(entries) {
+  if (!currentUser) return;
+  try {
+    const batch = db.batch();
+    entries.forEach(entry => batch.set(db.collection(`users/${currentUser.uid}/diary`).doc(entry.date), entry));
+    await batch.commit();
+  } catch(e) {}
+}
+
+async function deleteFromCloud(date) {
+  if (!currentUser) return;
+  try { await db.collection(`users/${currentUser.uid}/diary`).doc(date).delete(); } catch(e) {}
+}
+
 const THEMES = {
   wolt:    { primary:'#4f8cff', accent:'#3d7aed' },
   bolt:    { primary:'#34d399', accent:'#059669' },
@@ -477,7 +582,7 @@ const THEMES = {
 const PLAT_LABELS = { bolt:'🟢 Bolt Food', wolt:'🔵 Wolt', foodora:'🩷 Foodora' };
 
 function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
-function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); saveToCloud(d); }
 function getLastBackup() { const v = localStorage.getItem(BACKUP_KEY); return v ? new Date(v) : null; }
 function setLastBackup() { localStorage.setItem(BACKUP_KEY, new Date().toISOString()); }
 
@@ -931,6 +1036,7 @@ document.getElementById('btn-delete-cancel').addEventListener('click',()=>docume
 document.getElementById('btn-delete-confirm').addEventListener('click',()=>{
   const date = document.getElementById('delete-id').value;
   saveData(loadData().filter(d=>d.date!==date));
+  deleteFromCloud(date);
   document.getElementById('modal-delete').classList.remove('open');
   showToast('🗑 Záznam smazán'); renderDiary();
 });
@@ -1156,6 +1262,7 @@ function renderSettings() {
   document.getElementById('last-backup-info').textContent = lb
     ? `Poslední záloha: ${lb.toLocaleString('cs-CZ')}`
     : 'Žádná záloha dosud nebyla exportována.';
+  updateAuthUI();
 }
 
 function checkBackupWarning() {
