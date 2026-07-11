@@ -1158,6 +1158,12 @@ function buildDayCard(entry) {
   const bdrClr  = platColor(plat);
   const pct     = entry.earnings > 0 ? Math.round((entry.fuelCost||0) / entry.earnings * 100) : 0;
   const pctClr  = pct < 25 ? '#34d399' : pct < 40 ? '#fbbf24' : '#f87171';
+  const route   = loadHomeRoute();
+  const effectiveHomeCost = entry.homeCost > 0
+    ? entry.homeCost
+    : (route.enabled && route.km > 0
+        ? parseFloat(((route.km/100) * route.consumption * (entry.fuelPrice||36.5)).toFixed(2))
+        : 0);
   return `
   <div class="day-card" style="border-left-color:${bdrClr};" id="card-${entry.date}">
     <div class="day-card-header" onclick="toggleCard('${entry.date}')">
@@ -1196,7 +1202,7 @@ function buildDayCard(entry) {
       <div class="detail-row"><span>💰 Výdělek/hod</span><span>${fmtKc(eph)}</span></div>
       ` : `<div class="detail-row"><span>⏱ Čas práce</span><span style="color:#4a5060;">nezadán</span></div>`}
       <div class="detail-row"><span>🛣 Nájezd ve městě</span><span>${entry.kmCity ? entry.kmCity+' km' : '–'}</span></div>
-      ${entry.homeCost > 0 ? `<div class="detail-row"><span>🏠 Cesta z domu</span><span>-${fmtKc(entry.homeCost)}</span></div>` : ''}
+      ${effectiveHomeCost > 0 ? `<div class="detail-row"><span>🏠 Cesta z domu</span><span>-${fmtKc(effectiveHomeCost)}</span></div>` : ''}
       ${entry.fuelPrice ? `<div class="detail-row"><span>⛽ Cena PHM</span><span>${entry.fuelPrice.toFixed(1).replace('.',',')} Kč/l</span></div>` : ''}
       ${entry.liters ? `<div class="detail-row"><span>🪣 Spáleno</span><span>${entry.liters.toFixed(2).replace('.',',')} l</span></div>` : ''}
       ${entry.note ? `<div class="detail-row"><span>📝 Poznámka</span><span>${entry.note}</span></div>` : ''}
