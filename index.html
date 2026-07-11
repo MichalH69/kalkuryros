@@ -1153,6 +1153,8 @@ function buildDayCard(entry) {
   const badgeCls= 'badge-'+plat;
   const platLbl = PLAT_LABELS[plat]||'Neznámá';
   const bdrClr  = platColor(plat);
+  const pct     = entry.earnings > 0 ? Math.round((entry.fuelCost||0) / entry.earnings * 100) : 0;
+  const pctClr  = pct < 25 ? '#34d399' : pct < 40 ? '#fbbf24' : '#f87171';
   return `
   <div class="day-card" style="border-left-color:${bdrClr};" id="card-${entry.date}">
     <div class="day-card-header" onclick="toggleCard('${entry.date}')">
@@ -1168,6 +1170,7 @@ function buildDayCard(entry) {
     <div class="day-summary-row">
       <div class="day-sum-item">Tržba <span>${fmtKc(entry.earnings||0)}</span></div>
       <div class="day-sum-item">Palivo <span>-${fmtKc(entry.fuelCost||0)}</span></div>
+      <div class="day-sum-item">Náklady <span style="color:${pctClr};">${pct} %</span></div>
       ${entry.kmCity ? `<div class="day-sum-item">Km <span>${entry.kmCity} km</span></div>` : ''}
     </div>
     <div class="day-detail" id="detail-${entry.date}">
