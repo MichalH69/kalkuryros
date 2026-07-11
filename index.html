@@ -163,6 +163,7 @@ svg.chart { display:block; }
 .version-card .ver { font-size:1rem; font-weight:700; color:var(--clr-primary); }
 .version-card .ver-sub { font-size:0.75rem; color:#4a5060; margin-top:4px; }
 /* ONBOARDING */
+@keyframes pulse { from { opacity:1; transform:scale(1); } to { opacity:.75; transform:scale(1.04); } }
 .onboard-overlay { display:none; position:fixed; inset:0; background:linear-gradient(135deg,#0a0d14,#0f1422); z-index:500; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; }
 .onboard-overlay.open { display:flex; }
 .onboard-step { display:none; text-align:center; max-width:380px; width:100%; }
@@ -179,6 +180,15 @@ svg.chart { display:block; }
 .ob-btn { padding:12px 28px; border-radius:12px; border:none; font-size:0.95rem; font-weight:700; cursor:pointer; }
 .ob-btn-primary { background:var(--clr-primary); color:#fff; }
 .ob-btn-secondary { background:#22252e; color:#6b7280; }
+/* GDPR CONSENT */
+.gdpr-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); backdrop-filter:blur(4px); z-index:600; align-items:center; justify-content:center; padding:24px; }
+.gdpr-overlay.open { display:flex; }
+.gdpr-box { background:#13161e; border:1px solid #2e3240; border-radius:20px; padding:32px 28px; max-width:380px; width:100%; text-align:center; }
+.gdpr-flag { font-size:3.5rem; margin-bottom:16px; }
+.gdpr-box h2 { font-size:1.1rem; font-weight:800; color:#f1f1f1; margin-bottom:10px; }
+.gdpr-box p { font-size:0.82rem; color:#8b8fa8; line-height:1.65; margin-bottom:8px; }
+.gdpr-company { font-size:0.78rem; color:#4a5060; font-style:italic; margin-bottom:20px; }
+.gdpr-box .btn-gdpr { width:100%; padding:13px; border-radius:12px; background:var(--clr-primary); color:#fff; border:none; font-size:0.95rem; font-weight:700; cursor:pointer; margin-bottom:8px; }
 /* CHART TOOLTIP */
 #chart-tt { display:none; position:fixed; background:#1e2130; border:1px solid #2e3240; color:#e8e8e8; padding:7px 12px; border-radius:9px; font-size:0.78rem; pointer-events:none; z-index:150; line-height:1.6; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,.4); }
 /* AVATAR BUTTON */
@@ -210,64 +220,74 @@ svg.chart { display:block; }
   </div>
 </div>
 
+<!-- GDPR CONSENT -->
+<div class="gdpr-overlay" id="gdpr-overlay">
+  <div class="gdpr-box">
+    <div class="gdpr-flag">🇮🇱</div>
+    <h2>Souhlas se zpracováním osobních údajů</h2>
+    <p>Používáním této aplikace souhlasíte se zpracováním vašich osobních údajů, včetně dat o příjmech, poloze a aktivitě. Tato data mohou být přenášena a zpracovávána v našem datovém centru.</p>
+    <p class="gdpr-company">Herbatronix™ Data Processing Division<br>Ha-Yarkon 33, Tel Aviv-Yafo, Izrael<br>odnož konglomerátu Raator Industries s.r.o.</p>
+    <button class="btn-gdpr" id="gdpr-agree">Souhlasím a pokračuji</button>
+  </div>
+</div>
+
 <!-- ONBOARDING -->
 <div class="onboard-overlay" id="onboard-overlay">
   <div style="max-width:400px;width:100%;">
     <div class="onboard-step active" id="ob-step-0">
-      <div class="ob-icon">🚗</div>
-      <div class="ob-badge">VERZE 2026.0.0.2</div>
-      <h2>Vítej v nové verzi!</h2>
-      <p>Rozvoz tracker prošel velkou aktualizací. Pojď si projít co je nového.</p>
+      <div class="ob-icon">🚨</div>
+      <div class="ob-badge" style="background:#ef4444;animation:pulse 1.2s infinite alternate;">!!! HUGE UPDATE ALERT !!!</div>
+      <h2 style="font-size:1.7rem;letter-spacing:-.01em;">Velká aktualizace!</h2>
+      <p>Verze <strong style="color:var(--clr-primary);">2026.0.0.3</strong> přináší zásadní novinky. Pojď se podívat co je nového.</p>
     </div>
     <div class="onboard-step" id="ob-step-1">
-      <div class="ob-icon">📖</div>
-      <h2>Rozšířený deník</h2>
-      <p>Každý den teď má vlastní dashboard se všemi detaily:</p>
+      <div class="ob-icon">☁️</div>
+      <div class="ob-badge">HLAVNÍ NOVINKA</div>
+      <h2>Synchronizace přes Google</h2>
+      <p>Tvá data jsou teď v bezpečí v cloudu. Přihlas se Google účtem a záznamy se automaticky zálohují na Herbatronix servery v Tel Avivu.</p>
       <ul>
-        <li>⏱ Čas práce a hodinový výdělek</li>
-        <li>🛣 Nájezd ve městě</li>
-        <li>⛽ Rozpad nákladů na palivo</li>
-        <li>📊 Mini přehled tržba / náklady / zisk</li>
+        <li>🔄 Automatická záloha po každém uložení</li>
+        <li>📱 Přístup z více zařízení</li>
+        <li>🔒 Přihlášení přes Google</li>
+        <li>📡 Funguje i offline — sync při připojení</li>
       </ul>
     </div>
     <div class="onboard-step" id="ob-step-2">
-      <div class="ob-icon">📊</div>
-      <h2>Statistiky</h2>
-      <p>Nová záložka Statistiky s grafy:</p>
+      <div class="ob-icon">👤</div>
+      <h2>Profil uživatele</h2>
+      <p>Ikonka vpravo nahoře otevře tvůj profil. Nastav si jméno a profilovou fotku.</p>
       <ul>
-        <li>📅 Tržba a zisk dle dne v týdnu</li>
-        <li>⏰ Průměrný hodinový výdělek</li>
-        <li>📈 Tržba v čase (posledních 30 dní)</li>
-        <li>🍩 Podíl platforem</li>
+        <li>📷 Vlastní fotografie (ořeže se automaticky)</li>
+        <li>🏷 Jméno zobrazené v aplikaci</li>
+        <li>🔑 Přihlášení / odhlášení Google účtu</li>
       </ul>
     </div>
     <div class="onboard-step" id="ob-step-3">
-      <div class="ob-icon">🎨</div>
-      <h2>Platformy & Themes</h2>
-      <p>Tři barevné motivy podle platformy — přepni v Nastavení:</p>
+      <div class="ob-icon">🏠</div>
+      <h2>Cesta z domu</h2>
+      <p>Pevně zadaná cesta Desná–Liberec je pryč. Teď si v Nastavení nakonfiguruj vlastní trasu:</p>
       <ul>
-        <li style="color:#34d399">🟢 Bolt Food — zelená</li>
-        <li style="color:#4f8cff">🔵 Wolt — modrá</li>
-        <li style="color:#e879a0">🩷 Foodora — růžová</li>
+        <li>✏️ Název trasy, km a spotřeba</li>
+        <li>⚡ Automaticky se připočítá ke každému dni</li>
+        <li>📊 Viditelná v detailu každého záznamu</li>
       </ul>
-      <p style="margin-top:10px;">Každý záznam má vlastní platformu a barvu.</p>
     </div>
     <div class="onboard-step" id="ob-step-4">
-      <div class="ob-icon">⚡</div>
-      <h2>Vlastní presety spotřeby</h2>
-      <p>V kalkulačce si teď můžeš přidat vlastní preset spotřeby:</p>
+      <div class="ob-icon">📊</div>
+      <h2>Vylepšené statistiky</h2>
+      <p>Grafy dostaly nový kabát:</p>
       <ul>
-        <li>Klepni na <strong style="color:var(--clr-primary)">+ vlastní</strong> za stávajícími presety</li>
-        <li>Zadej název a spotřebu v l/100 km</li>
-        <li>Preset se uloží a bude dostupný vždy</li>
-        <li>Podržením prstu na vlastním presetu ho smažeš</li>
+        <li>📈 Plynulá animace s přechodem</li>
+        <li>💬 Interaktivní popisky při najetí</li>
+        <li>🎨 Gradientní výplň plochy grafu</li>
+        <li>📉 Procenta nákladů u každého dne</li>
       </ul>
     </div>
     <div class="onboard-step" id="ob-step-5">
-      <div class="ob-icon">🔄</div>
-      <h2>Historická data</h2>
-      <p>Všechny starší záznamy byly automaticky přepočítány — doplnil se nájezd km a platforma Bolt Food na základě uložených nákladů.</p>
-      <p style="margin-top:10px;">Nic jsi nemusel dělat ručně. 🎉</p>
+      <div class="ob-icon">✅</div>
+      <h2>To je vše!</h2>
+      <p>Aplikace je teď výrazně silnější. Nezapomeň se přihlásit Google účtem pro aktivaci cloudové zálohy.</p>
+      <p style="margin-top:10px;font-size:0.8rem;color:#4a5060;">© Herbatronix™ — odnož Raator Industries</p>
       <div style="margin-top:20px; display:flex; align-items:center; justify-content:center; gap:10px;">
         <input type="checkbox" id="ob-dont-show" style="width:18px;height:18px;accent-color:var(--clr-primary);cursor:pointer;">
         <label for="ob-dont-show" style="font-size:0.85rem;color:#6b7280;cursor:pointer;">Příště nezobrazovat</label>
@@ -418,8 +438,9 @@ svg.chart { display:block; }
     <button class="btn btn-danger" id="btn-clear">🗑 Smazat všechna data</button>
   </div>
   <div class="version-card">
-    <div class="ver">Verze 2026.0.0.2</div>
+    <div class="ver">Verze 2026.0.0.3</div>
     <div class="ver-sub">Rozvoz tracker — osobní aplikace pro sledování výdělků kurýra</div>
+    <div class="ver-sub" style="margin-top:6px;">© Herbatronix™ — odnož konglomerátu Raator Industries</div>
   </div>
 </div>
 
@@ -538,7 +559,8 @@ svg.chart { display:block; }
 const STORAGE_KEY   = 'rozvoz_diary';
 const BACKUP_KEY    = 'rozvoz_last_backup';
 const THEME_KEY     = 'rozvoz_theme';
-const ONBOARD_KEY   = 'rozvoz_seen_v2026002';
+const ONBOARD_KEY   = 'rozvoz_seen_v2026003';
+const GDPR_KEY      = 'rozvoz_gdpr_consent_v1';
 const BACKUP_DAYS   = 7;
 const RETROFIT_DATE = '2026-07-05';
 
@@ -1626,6 +1648,19 @@ document.getElementById('btn-clear').addEventListener('click',()=>{
 });
 
 // ══════════════════════════════════════════════════════
+//  GDPR CONSENT
+// ══════════════════════════════════════════════════════
+function initGdpr() {
+  if (localStorage.getItem(GDPR_KEY)) return;
+  document.getElementById('gdpr-overlay').classList.add('open');
+}
+document.getElementById('gdpr-agree').addEventListener('click', () => {
+  localStorage.setItem(GDPR_KEY, '1');
+  document.getElementById('gdpr-overlay').classList.remove('open');
+  initOnboarding();
+});
+
+// ══════════════════════════════════════════════════════
 //  ONBOARDING
 // ══════════════════════════════════════════════════════
 const OB_STEPS = 6;
@@ -1670,7 +1705,11 @@ applyTheme(savedTheme);
 calculate();
 checkBackupWarning();
 renderAvatar();
-initOnboarding();
+if (!localStorage.getItem(GDPR_KEY)) {
+  initGdpr();
+} else {
+  initOnboarding();
+}
 </script>
 </body>
 </html>
