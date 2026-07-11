@@ -179,6 +179,8 @@ svg.chart { display:block; }
 .ob-btn { padding:12px 28px; border-radius:12px; border:none; font-size:0.95rem; font-weight:700; cursor:pointer; }
 .ob-btn-primary { background:var(--clr-primary); color:#fff; }
 .ob-btn-secondary { background:#22252e; color:#6b7280; }
+/* CHART TOOLTIP */
+#chart-tt { display:none; position:fixed; background:#1e2130; border:1px solid #2e3240; color:#e8e8e8; padding:7px 12px; border-radius:9px; font-size:0.78rem; pointer-events:none; z-index:150; line-height:1.6; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,.4); }
 /* AVATAR BUTTON */
 .avatar-btn { position:fixed; top:14px; right:16px; width:38px; height:38px; border-radius:50%; border:2px solid #2a2d37; background:#22252e; cursor:pointer; z-index:90; overflow:hidden; padding:0; display:flex; align-items:center; justify-content:center; transition:.15s; }
 .avatar-btn:hover { border-color:var(--clr-primary); }
@@ -190,6 +192,7 @@ svg.chart { display:block; }
 <body>
 
 <div class="toast" id="toast"></div>
+<div id="chart-tt"></div>
 
 <button class="avatar-btn" id="avatar-btn" onclick="openProfileModal()">
   <span id="avatar-default"><svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
@@ -1259,10 +1262,27 @@ document.getElementById('btn-delete-confirm').addEventListener('click',()=>{
 });
 
 // ══════════════════════════════════════════════════════
-//  STATISTICS — SVG charts
+//  STATISTICS
 // ══════════════════════════════════════════════════════
 var DAY_NAMES = ['Po','Út','St','Čt','Pá','So','Ne'];
 var PLAT_COLORS = {bolt:'#34d399', wolt:'#4f8cff', foodora:'#e879a0'};
+var _gid = 0;
+
+function ctShow(evt, html) {
+  var tt = document.getElementById('chart-tt');
+  tt.innerHTML = html;
+  tt.style.display = 'block';
+  var x = Math.min(evt.clientX + 14, window.innerWidth - 160);
+  var y = Math.max(8, evt.clientY - 52);
+  tt.style.left = x + 'px';
+  tt.style.top  = y + 'px';
+}
+function ctHide() { document.getElementById('chart-tt').style.display = 'none'; }
+
+function fmtAxisY(v) {
+  if (v >= 1000) return (v / 1000).toFixed(1).replace('.', ',') + 'k';
+  return Math.round(v) + '';
+}
 
 function renderStats() {
   try {
@@ -1281,194 +1301,275 @@ function renderStats() {
     parts.push(chartDonut(data));
     parts.push(chartScatter(data, primary));
     el.innerHTML = parts.join('');
+    animateTimelines();
   } catch(e) {
     document.getElementById('stats-content').innerHTML = '<div class="empty"><div class="e-icon">⚠️</div>Chyba při načítání statistik.<br>' + e.message + '</div>';
   }
 }
 
+function animateTimelines() {
+  requestAnimationFrame(function() {
+    document.querySelectorAll('.tl-path').forEach(function(path) {
+      try {
+        var len = path.getTotalLength();
+        path.style.strokeDasharray = len;
+        path.style.strokeDashoffset = len;
+        path.style.transition = 'none';
+        requestAnimationFrame(function() {
+          path.style.transition = 'stroke-dashoffset 1s ease-out';
+          path.style.strokeDashoffset = '0';
+        });
+      } catch(e) {}
+    });
+  });
+}
+
 function avgByDow(data, field) {
-  var sums = [0,0,0,0,0,0,0];
-  var counts = [0,0,0,0,0,0,0];
+  var sums = [0,0,0,0,0,0,0], counts = [0,0,0,0,0,0,0];
   for (var i=0; i<data.length; i++) {
     var e = data[i];
     var dow = (new Date(e.date + 'T12:00:00').getDay() + 6) % 7;
     var val = 0;
-    if (field === 'earnings') {
-      val = e.earnings || 0;
-    } else if (field === 'net') {
-      val = (e.earnings || 0) - (e.fuelCost || 0);
-    } else if (field === 'eph') {
+    if (field === 'earnings') { val = e.earnings || 0; }
+    else if (field === 'net') { val = (e.earnings||0) - (e.fuelCost||0); }
+    else if (field === 'eph') {
       var dur = fmtH(e.startTime, e.endTime);
       if (!dur || dur.hours <= 0) continue;
-      val = ((e.earnings || 0) - (e.fuelCost || 0)) / dur.hours;
+      val = ((e.earnings||0) - (e.fuelCost||0)) / dur.hours;
     }
-    sums[dow] += val;
-    counts[dow]++;
+    sums[dow] += val; counts[dow]++;
   }
   var result = [];
-  for (var j=0; j<7; j++) {
-    result.push(counts[j] > 0 ? sums[j] / counts[j] : 0);
-  }
+  for (var j=0; j<7; j++) result.push(counts[j] > 0 ? sums[j]/counts[j] : 0);
   return result;
 }
 
 function makeBars(values, labels, color) {
-  var W=340, H=160, pad=32, barW=30, gap=7;
+  var W=340, padL=48, padT=16, padB=26, barW=28, gap=6;
+  var chartW = W - padL - 8;
+  var chartH = 130;
+  var H = padT + chartH + padB;
   var max = 1;
   for (var i=0; i<values.length; i++) { if (values[i] > max) max = values[i]; }
-  var bars = '';
+  var stepX = chartW / values.length;
+  var grid = '', bars = '';
+  var gSteps = [0.25, 0.5, 0.75, 1.0];
+  for (var gi=0; gi<gSteps.length; gi++) {
+    var gy = (padT + chartH - gSteps[gi]*chartH).toFixed(1);
+    grid += '<line x1="'+padL+'" y1="'+gy+'" x2="'+W+'" y2="'+gy+'" stroke="#2a2d37" stroke-width="1" opacity="0.8"/>';
+    grid += '<text x="'+(padL-4)+'" y="'+(parseFloat(gy)+4)+'" text-anchor="end" font-size="8" fill="#4a5060">'+fmtAxisY(max*gSteps[gi])+'</text>';
+  }
   for (var i=0; i<values.length; i++) {
     var v = values[i];
-    var bh = Math.max(2, (v/max)*(H-pad));
-    var x  = pad + i*(barW+gap);
-    var y  = H - bh;
-    var lbl = v > 0 ? Math.round(v) : '';
-    bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + bh + '" rx="4" fill="' + color + '" opacity="0.85"/>';
-    bars += '<text x="' + (x+barW/2) + '" y="' + (y-4) + '" text-anchor="middle" font-size="9" fill="#a0a4ad">' + lbl + '</text>';
-    bars += '<text x="' + (x+barW/2) + '" y="' + (H+13) + '" text-anchor="middle" font-size="9" fill="#6b7280">' + labels[i] + '</text>';
+    var bh = Math.max(2, (v/max)*chartH);
+    var bx = (padL + i*stepX + (stepX-barW)/2).toFixed(1);
+    var by = (padT + chartH - bh).toFixed(1);
+    var lbl = v > 0 ? fmtAxisY(v) : '';
+    var tt = labels[i] + ': ' + Math.round(v) + ' Kč';
+    var op = v > 0 ? '0.88' : '0.18';
+    bars += '<g>'
+      + '<rect x="'+bx+'" y="'+by+'" width="'+barW+'" height="'+bh.toFixed(1)+'" rx="5" fill="'+color+'" opacity="'+op+'" style="cursor:pointer"'
+      + ' onmouseover="ctShow(event,\''+tt+'\')" onmouseout="ctHide()">'
+      + '<animate attributeName="height" from="0" to="'+bh.toFixed(1)+'" dur="0.45s" fill="freeze"/>'
+      + '<animate attributeName="y" from="'+(padT+chartH)+'" to="'+by+'" dur="0.45s" fill="freeze"/>'
+      + '</rect>';
+    if (lbl) bars += '<text x="'+(parseFloat(bx)+barW/2)+'" y="'+(parseFloat(by)-4)+'" text-anchor="middle" font-size="8" fill="#a0a4ad">'+lbl+'</text>';
+    bars += '<text x="'+(parseFloat(bx)+barW/2)+'" y="'+(padT+chartH+17)+'" text-anchor="middle" font-size="9" fill="#6b7280">'+labels[i]+'</text>';
+    bars += '</g>';
   }
-  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + (H+20) + '" width="100%">'
-    + '<line x1="' + pad + '" y1="0" x2="' + pad + '" y2="' + H + '" stroke="#2a2d37" stroke-width="1"/>'
-    + '<line x1="' + pad + '" y1="' + H + '" x2="' + W + '" y2="' + H + '" stroke="#2a2d37" stroke-width="1"/>'
-    + bars + '</svg>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="overflow:visible">'
+    + '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+chartH)+'" stroke="#2a2d37" stroke-width="1"/>'
+    + grid + bars + '</svg>';
 }
 
 function chartByDow(data, field, title, color) {
   var vals = avgByDow(data, field);
-  return '<div class="chart-card"><h3>' + title + '</h3><div class="chart-wrap">' + makeBars(vals, DAY_NAMES, color) + '</div></div>';
+  var hasAny = vals.some(function(v){ return v > 0; });
+  if (!hasAny) return '<div class="chart-card"><h3>'+title+'</h3><div class="empty" style="padding:14px;font-size:0.82rem;">Zatím žádná data.</div></div>';
+  return '<div class="chart-card"><h3>'+title+'</h3><div class="chart-wrap">'+makeBars(vals, DAY_NAMES, color)+'</div></div>';
 }
 
 function chartTimeline(data, primary) {
   var sorted = data.slice().sort(function(a,b){ return a.date < b.date ? -1 : 1; }).slice(-30);
   var n = sorted.length;
-  if (n < 2) return '<div class="chart-card"><h3>Tržba v čase</h3><div class="empty" style="padding:20px">Potřeba alespoň 2 záznamy.</div></div>';
-  var W=340, H=140, padL=38, padB=22;
-  var chartH = H - padB;
+  if (n < 2) return '<div class="chart-card"><h3>Tržba v čase</h3><div class="empty" style="padding:14px;font-size:0.82rem;">Potřeba alespoň 2 záznamy.</div></div>';
+  var W=340, padL=46, padT=28, padB=30, padR=8;
+  var chartW = W - padL - padR;
+  var chartH = 120;
+  var H = padT + chartH + padB;
+  var xStep = chartW / (n - 1);
   var earnings = [], nets = [];
   for (var i=0; i<n; i++) {
     earnings.push(sorted[i].earnings || 0);
-    nets.push((sorted[i].earnings || 0) - (sorted[i].fuelCost || 0));
+    nets.push((sorted[i].earnings||0) - (sorted[i].fuelCost||0));
   }
   var maxV = 1;
   for (var i=0; i<n; i++) { if (earnings[i] > maxV) maxV = earnings[i]; }
-  var xStep = (W - padL - 4) / (n - 1);
+  _gid++;
+  var gidE = 'tge'+_gid, gidN = 'tgn'+_gid;
 
-  function polyLine(vals, clr) {
-    var ptArr = [];
-    for (var i=0; i<n; i++) {
-      ptArr.push((padL + i*xStep).toFixed(1) + ',' + (H - padB - (vals[i]/maxV)*chartH).toFixed(1));
-    }
-    var pts = ptArr.join(' ');
-    var areaArr = [(padL).toFixed(1) + ',' + (H-padB)].concat(ptArr).concat([(padL+(n-1)*xStep).toFixed(1) + ',' + (H-padB)]);
-    return '<polygon points="' + areaArr.join(' ') + '" fill="' + clr + '" opacity="0.10"/>'
-         + '<polyline points="' + pts + '" fill="none" stroke="' + clr + '" stroke-width="2" stroke-linejoin="round"/>';
+  // grid
+  var grid = '';
+  var gSteps2 = [0.25, 0.5, 0.75, 1.0];
+  for (var gi=0; gi<gSteps2.length; gi++) {
+    var gy2 = (padT + chartH - gSteps2[gi]*chartH).toFixed(1);
+    grid += '<line x1="'+padL+'" y1="'+gy2+'" x2="'+(W-padR)+'" y2="'+gy2+'" stroke="#2a2d37" stroke-width="1" opacity="0.8"/>';
+    grid += '<text x="'+(padL-4)+'" y="'+(parseFloat(gy2)+4)+'" text-anchor="end" font-size="8" fill="#4a5060">'+fmtAxisY(maxV*gSteps2[gi])+'</text>';
   }
 
-  var dots = '';
-  for (var i=0; i<n; i++) {
-    var v = nets[i];
-    var cx2 = (padL + i*xStep).toFixed(1);
-    var cy2 = (H - padB - (v/maxV)*chartH).toFixed(1);
-    dots += '<circle cx="' + cx2 + '" cy="' + cy2 + '" r="3" fill="' + (v>=0?'#34d399':'#f87171') + '"/>';
-  }
-
+  // X labels — D.M. format, rotated if many
+  var rotate = n > 10;
+  var xLblStep = Math.max(1, Math.ceil(n / (rotate ? 6 : 5)));
   var axLabels = '';
-  var step2 = Math.ceil(n / 5);
-  for (var i=0; i<n; i+=step2) {
+  for (var i=0; i<n; i+=xLblStep) {
     var ax = (padL + i*xStep).toFixed(1);
-    axLabels += '<text x="' + ax + '" y="' + (H+2) + '" text-anchor="middle" font-size="8" fill="#6b7280">' + sorted[i].date.slice(5) + '</text>';
+    var dp = sorted[i].date.split('-');
+    var lbl = parseInt(dp[2]) + '.' + parseInt(dp[1]) + '.';
+    if (rotate) {
+      axLabels += '<text x="'+ax+'" y="'+(padT+chartH+18)+'" text-anchor="end" font-size="8" fill="#6b7280" transform="rotate(-38,'+ax+','+(padT+chartH+18)+')">'+lbl+'</text>';
+    } else {
+      axLabels += '<text x="'+ax+'" y="'+(padT+chartH+16)+'" text-anchor="middle" font-size="8" fill="#6b7280">'+lbl+'</text>';
+    }
   }
 
-  var svg = '<svg class="chart" viewBox="0 0 ' + W + ' ' + (H+10) + '" width="100%">'
-    + '<line x1="' + padL + '" y1="0" x2="' + padL + '" y2="' + (H-padB) + '" stroke="#2a2d37"/>'
-    + '<line x1="' + padL + '" y1="' + (H-padB) + '" x2="' + W + '" y2="' + (H-padB) + '" stroke="#2a2d37"/>'
-    + polyLine(earnings, primary)
-    + polyLine(nets, '#34d399')
-    + dots + axLabels
-    + '<circle cx="' + (padL+4) + '" cy="10" r="4" fill="' + primary + '" opacity=".8"/>'
-    + '<text x="' + (padL+12) + '" y="14" font-size="9" fill="#a0a4ad">Tržba</text>'
-    + '<circle cx="' + (padL+60) + '" cy="10" r="4" fill="#34d399" opacity=".8"/>'
-    + '<text x="' + (padL+68) + '" y="14" font-size="9" fill="#a0a4ad">Čistý zisk</text>'
+  function buildPathD(vals) {
+    var d = '';
+    for (var i=0; i<n; i++) {
+      var px = (padL + i*xStep).toFixed(1);
+      var py = (padT + chartH - (vals[i]/maxV)*chartH).toFixed(1);
+      d += (i===0 ? 'M' : 'L') + px + ',' + py;
+    }
+    return d;
+  }
+
+  function buildSeries(vals, gradId, clr) {
+    var pathD = buildPathD(vals);
+    var lastX = (padL + (n-1)*xStep).toFixed(1);
+    var baseY = (padT + chartH).toFixed(1);
+    return '<path d="'+pathD+' L'+lastX+','+baseY+' L'+padL+','+baseY+' Z" fill="url(#'+gradId+')" stroke="none"/>'
+         + '<path class="tl-path" d="'+pathD+'" fill="none" stroke="'+clr+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  function buildDots(vals, clr, label) {
+    var out = '';
+    for (var i=0; i<n; i++) {
+      var px = (padL + i*xStep).toFixed(1);
+      var py = (padT + chartH - (vals[i]/maxV)*chartH).toFixed(1);
+      var dp2 = sorted[i].date.split('-');
+      var dl = parseInt(dp2[2]) + '.' + parseInt(dp2[1]) + '.';
+      var tt = dl + '||' + label + ': ' + Math.round(vals[i]) + ' Kč';
+      var dotClr = (label === 'Zisk' && vals[i] < 0) ? '#f87171' : clr;
+      out += '<circle cx="'+px+'" cy="'+py+'" r="4" fill="'+dotClr+'" stroke="#16181f" stroke-width="1.5" style="cursor:pointer"'
+           + ' onmouseover="ctShow(event,\''+tt+'\'.replace(\'||\',\'<br>\'))" onmouseout="ctHide()"/>';
+    }
+    return out;
+  }
+
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="overflow:visible">'
+    + '<defs>'
+    + '<linearGradient id="'+gidE+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+primary+'" stop-opacity="0.28"/><stop offset="100%" stop-color="'+primary+'" stop-opacity="0"/></linearGradient>'
+    + '<linearGradient id="'+gidN+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#34d399" stop-opacity="0.2"/><stop offset="100%" stop-color="#34d399" stop-opacity="0"/></linearGradient>'
+    + '</defs>'
+    + '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+chartH)+'" stroke="#2a2d37"/>'
+    + grid
+    + buildSeries(earnings, gidE, primary)
+    + buildSeries(nets, gidN, '#34d399')
+    + buildDots(earnings, primary, 'Tržba')
+    + buildDots(nets, '#34d399', 'Zisk')
+    + axLabels
+    + '<circle cx="'+(padL+4)+'" cy="12" r="4" fill="'+primary+'" opacity=".85"/>'
+    + '<text x="'+(padL+12)+'" y="16" font-size="9" fill="#a0a4ad">Tržba</text>'
+    + '<circle cx="'+(padL+56)+'" cy="12" r="4" fill="#34d399" opacity=".85"/>'
+    + '<text x="'+(padL+64)+'" y="16" font-size="9" fill="#a0a4ad">Čistý zisk</text>'
     + '</svg>';
-  return '<div class="chart-card"><h3>Tržba v čase (posl. 30 dní)</h3><div class="chart-wrap">' + svg + '</div></div>';
+  return '<div class="chart-card"><h3>Tržba v čase (posl. 30 dní)</h3><div class="chart-wrap">'+svg+'</div></div>';
 }
 
 function chartDonut(data) {
   var counts = {bolt:0, wolt:0, foodora:0};
   for (var i=0; i<data.length; i++) {
     var p = data[i].platform;
-    if (p && counts[p] !== undefined) counts[p]++;
-    else counts.bolt++;
+    if (p && counts[p] !== undefined) counts[p]++; else counts.bolt++;
   }
   var total = counts.bolt + counts.wolt + counts.foodora;
   if (total === 0) return '';
-  var cx=80, cy=70, r=52, ir=28;
+  var cx=76, cy=74, r=54, ir=30;
   var startAngle = -Math.PI/2;
   var slices = '', legend = '';
   var keys = ['bolt','wolt','foodora'];
   for (var ki=0; ki<keys.length; ki++) {
     var k = keys[ki];
-    var v = counts[k];
-    if (!v) continue;
+    var v = counts[k]; if (!v) continue;
     var angle = (v/total)*2*Math.PI;
     var endAngle = startAngle + angle;
     var large = angle > Math.PI ? 1 : 0;
-    var x1=(cx+r*Math.cos(startAngle)).toFixed(2), y1=(cy+r*Math.sin(startAngle)).toFixed(2);
-    var x2=(cx+r*Math.cos(endAngle)).toFixed(2),   y2=(cy+r*Math.sin(endAngle)).toFixed(2);
+    var x1=(cx+r*Math.cos(startAngle)).toFixed(2),  y1=(cy+r*Math.sin(startAngle)).toFixed(2);
+    var x2=(cx+r*Math.cos(endAngle)).toFixed(2),    y2=(cy+r*Math.sin(endAngle)).toFixed(2);
     var ix1=(cx+ir*Math.cos(startAngle)).toFixed(2), iy1=(cy+ir*Math.sin(startAngle)).toFixed(2);
     var ix2=(cx+ir*Math.cos(endAngle)).toFixed(2),   iy2=(cy+ir*Math.sin(endAngle)).toFixed(2);
-    slices += '<path d="M'+ix1+','+iy1+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' L'+ix2+','+iy2+' A'+ir+','+ir+' 0 '+large+',0 '+ix1+','+iy1+'" fill="'+PLAT_COLORS[k]+'" opacity="0.85"/>';
+    var pct = Math.round(v/total*100);
+    var tt = (PLAT_LABELS[k]||k) + ': ' + v + ' dní (' + pct + '%)';
+    slices += '<path d="M'+ix1+','+iy1+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' L'+ix2+','+iy2+' A'+ir+','+ir+' 0 '+large+',0 '+ix1+','+iy1+'"'
+            + ' fill="'+PLAT_COLORS[k]+'" opacity="0.88" style="cursor:pointer"'
+            + ' onmouseover="ctShow(event,\''+tt+'\')" onmouseout="ctHide()"/>';
     startAngle = endAngle;
   }
-  var ly = 24;
+  slices += '<text x="'+cx+'" y="'+(cy-5)+'" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">'+total+'</text>';
+  slices += '<text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" font-size="9" fill="#6b7280">dní</text>';
+  var ly = 26;
   for (var ki=0; ki<keys.length; ki++) {
-    var k = keys[ki];
-    var v = counts[k];
-    if (!v) continue;
-    var pct = Math.round(v/total*100);
-    var lbl = PLAT_LABELS[k] || k;
-    legend += '<rect x="178" y="'+(ly-9)+'" width="10" height="10" rx="2" fill="'+PLAT_COLORS[k]+'"/>';
-    legend += '<text x="192" y="'+ly+'" font-size="10" fill="#a0a4ad">'+lbl+': '+v+'d ('+pct+'%)</text>';
+    var k = keys[ki]; var v = counts[k]; if (!v) continue;
+    var pct2 = Math.round(v/total*100);
+    legend += '<rect x="172" y="'+(ly-9)+'" width="10" height="10" rx="2" fill="'+PLAT_COLORS[k]+'"/>';
+    legend += '<text x="186" y="'+ly+'" font-size="10" fill="#a0a4ad">'+(PLAT_LABELS[k]||k)+': '+v+'d ('+pct2+'%)</text>';
     ly += 22;
   }
   return '<div class="chart-card"><h3>Podíl platforem</h3><div class="chart-wrap">'
-    + '<svg class="chart" viewBox="0 0 340 140" width="100%">'+slices+legend+'</svg></div></div>';
+    + '<svg viewBox="0 0 340 148" width="100%">'+slices+legend+'</svg></div></div>';
 }
 
 function chartScatter(data, primary) {
   var pts = [];
   for (var i=0; i<data.length; i++) {
-    if (data[i].kmCity > 0) pts.push({x: data[i].kmCity, y: data[i].earnings || 0});
+    if (data[i].kmCity > 0 && data[i].earnings > 0)
+      pts.push({x: data[i].kmCity, y: data[i].earnings, date: data[i].date});
   }
   if (pts.length < 3) return '';
-  var W=340, H=160, pad=36;
+  var W=340, padL=46, padT=14, padB=26, padR=8;
+  var chartW = W - padL - padR;
+  var chartH = 130;
+  var H = padT + chartH + padB;
   var maxX=1, maxY=1;
   for (var i=0; i<pts.length; i++) {
     if (pts[i].x > maxX) maxX = pts[i].x;
     if (pts[i].y > maxY) maxY = pts[i].y;
   }
-  var dots = '';
+  var grid = '', dots = '';
+  var gSteps3 = [0.25, 0.5, 0.75, 1.0];
+  for (var gi=0; gi<gSteps3.length; gi++) {
+    var gy3 = (padT + chartH - gSteps3[gi]*chartH).toFixed(1);
+    grid += '<line x1="'+padL+'" y1="'+gy3+'" x2="'+(W-padR)+'" y2="'+gy3+'" stroke="#2a2d37" stroke-width="1" opacity="0.8"/>';
+    grid += '<text x="'+(padL-4)+'" y="'+(parseFloat(gy3)+4)+'" text-anchor="end" font-size="8" fill="#4a5060">'+fmtAxisY(maxY*gSteps3[gi])+'</text>';
+  }
   for (var i=0; i<pts.length; i++) {
-    var dx = (pad + (pts[i].x/maxX)*(W-pad-10)).toFixed(1);
-    var dy = (H - pad - (pts[i].y/maxY)*(H-pad)).toFixed(1);
-    dots += '<circle cx="'+dx+'" cy="'+dy+'" r="4" fill="'+primary+'" opacity="0.7"/>';
+    var dx = (padL + (pts[i].x/maxX)*chartW).toFixed(1);
+    var dy = (padT + chartH - (pts[i].y/maxY)*chartH).toFixed(1);
+    var dp4 = pts[i].date.split('-');
+    var dl4 = parseInt(dp4[2]) + '.' + parseInt(dp4[1]) + '.';
+    var tt4 = dl4 + ': ' + pts[i].x + ' km / ' + Math.round(pts[i].y) + ' Kč';
+    dots += '<circle cx="'+dx+'" cy="'+dy+'" r="5" fill="'+primary+'" opacity="0.75" stroke="#16181f" stroke-width="1.5" style="cursor:pointer"'
+          + ' onmouseover="ctShow(event,\''+tt4+'\')" onmouseout="ctHide()"/>';
   }
-  var axX = '', axY = '';
-  var xVals = [0, Math.round(maxX/2), Math.round(maxX)];
-  for (var i=0; i<xVals.length; i++) {
-    var xp = (pad + (xVals[i]/maxX)*(W-pad-10)).toFixed(1);
-    axX += '<text x="'+xp+'" y="'+(H+4)+'" text-anchor="middle" font-size="8" fill="#6b7280">'+xVals[i]+'km</text>';
-  }
-  var yVals = [0, Math.round(maxY/2), Math.round(maxY)];
-  for (var i=0; i<yVals.length; i++) {
-    var yp = (H - pad - (yVals[i]/maxY)*(H-pad)).toFixed(1);
-    axY += '<text x="'+(pad-4)+'" y="'+(parseFloat(yp)+3)+'" text-anchor="end" font-size="8" fill="#6b7280">'+yVals[i]+'</text>';
+  var axX = '';
+  var xVals2 = [0, Math.round(maxX*0.5), Math.round(maxX)];
+  for (var i=0; i<xVals2.length; i++) {
+    var xp2 = (padL + (xVals2[i]/maxX)*chartW).toFixed(1);
+    axX += '<text x="'+xp2+'" y="'+(padT+chartH+16)+'" text-anchor="middle" font-size="8" fill="#6b7280">'+xVals2[i]+'km</text>';
   }
   return '<div class="chart-card"><h3>Nájezd vs. tržba</h3><div class="chart-wrap">'
-    + '<svg class="chart" viewBox="0 0 '+W+' '+(H+10)+'" width="100%">'
-    + '<line x1="'+pad+'" y1="0" x2="'+pad+'" y2="'+(H-pad)+'" stroke="#2a2d37"/>'
-    + '<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+W+'" y2="'+(H-pad)+'" stroke="#2a2d37"/>'
-    + dots + axX + axY + '</svg></div></div>';
+    + '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="overflow:visible">'
+    + '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+chartH)+'" stroke="#2a2d37"/>'
+    + grid + dots + axX + '</svg></div></div>';
 }
 
 // ══════════════════════════════════════════════════════
