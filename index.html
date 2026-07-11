@@ -109,7 +109,7 @@ input[type="date"], input[type="time"] { color-scheme:dark; }
 .chevron { font-size:0.8rem; color:#4a5060; transition:transform .25s; }
 .chevron.open { transform:rotate(180deg); }
 /* DAY SUMMARY ROW */
-.day-summary-row { display:flex; gap:12px; padding:0 16px 10px; }
+.day-summary-row { display:flex; justify-content:space-between; padding:0 16px 10px; }
 .day-sum-item { font-size:0.75rem; color:#7a7f8a; }
 .day-sum-item span { color:#a0a4ad; font-weight:600; }
 /* DAY DETAIL */
@@ -1199,9 +1199,9 @@ function buildDayCard(entry) {
       </div>
     </div>
     <div class="day-summary-row">
-      <div class="day-sum-item">T: <span>${fmtKc(entry.earnings||0)}</span></div>
-      <div class="day-sum-item">N: <span style="color:${pctClr};">${pct} %</span></div>
-      ${entry.kmCity ? `<div class="day-sum-item"><span>${entry.kmCity} km</span></div>` : ''}
+      <div class="day-sum-item">Tržba: <span>${fmtKc(entry.earnings||0)}</span></div>
+      <div class="day-sum-item">Náklady: <span>-${fmtKc(entry.fuelCost||0)}</span> <span style="color:${pctClr};">(${pct}%)</span></div>
+      ${entry.kmCity ? `<div class="day-sum-item"><span>${entry.kmCity} Km</span></div>` : ''}
     </div>
     <div class="day-detail" id="detail-${entry.date}">
       <div class="detail-tiles">
