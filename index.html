@@ -801,12 +801,10 @@ function retrofitData() {
       e.retrofitted = true;
       changed = true;
     }
-    if (e.fuelPrice === undefined) {
-      e.fuelPrice = 36.5;
-      changed = true;
-    }
-    if (e.liters === undefined) {
-      e.liters = parseFloat(((e.fuelCost || 0) / 36.5).toFixed(2));
+    // Odstranit špatně retrofitovaná pole — ponechat jen záznamy označené uživatelem
+    if ((e.fuelPrice !== undefined || e.liters !== undefined) && !e.fuelDataDirect) {
+      delete e.fuelPrice;
+      delete e.liters;
       changed = true;
     }
     if (e.homeCost === undefined) {
@@ -1085,6 +1083,7 @@ btnLog.addEventListener('click', () => {
     homeCost:  parseFloat((calcResult.homeCost||0).toFixed(2)),
     fuelPrice: calcResult.fuelPrice||0,
     liters:    parseFloat((calcResult.liters||0).toFixed(2)),
+    fuelDataDirect: true,
     detail: calcResult.detail,
     startTime: startT, endTime: endT,
     kmCity, platform,
