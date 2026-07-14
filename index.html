@@ -460,7 +460,7 @@ svg.chart { display:block; }
     <button class="btn btn-danger" id="btn-clear">🗑 Smazat všechna data</button>
   </div>
   <div class="version-card">
-    <div class="ver">Verze 2026.0.0.4</div>
+    <div class="ver">Verze 2026.0.0.5</div>
     <div class="ver-sub">Rozvoz tracker — osobní aplikace pro sledování výdělků kurýra</div>
     <div class="ver-sub" style="margin-top:6px;">© Herbatronix™ — odnož konglomerátu Raator Industries</div>
   </div>
@@ -518,7 +518,7 @@ svg.chart { display:block; }
       <div class="wheel-highlight" aria-hidden="true"></div>
       <div class="wheel-col" id="wheel-kc" tabindex="0" role="spinbutton" aria-label="Koruny" aria-valuemin="0" aria-valuemax="99"></div>
       <span class="wheel-sep" aria-hidden="true">,</span>
-      <div class="wheel-col" id="wheel-hal" tabindex="0" role="spinbutton" aria-label="Haléře" aria-valuemin="0" aria-valuemax="99"></div>
+      <div class="wheel-col" id="wheel-hal" tabindex="0" role="spinbutton" aria-label="Haléře" aria-valuemin="0" aria-valuemax="90"></div>
       <span class="wheel-unit" aria-hidden="true">Kč/l</span>
     </div>
     <div class="modal-actions">
@@ -1037,7 +1037,8 @@ function triggerConfirmHaptic() {
 const LAST_FUEL_PRICE_KEY = 'rozvoz_last_fuel_price';
 function loadLastFuelHalers() {
   const n = parseInt(localStorage.getItem(LAST_FUEL_PRICE_KEY), 10);
-  return (!isNaN(n) && n >= 0 && n <= 9999) ? n : 3650;
+  if (isNaN(n) || n < 0 || n > 9999) return 3650;
+  return Math.round(n / 10) * 10; // haléře jsou vždy násobky deseti
 }
 function saveLastFuelHalers(halers) { localStorage.setItem(LAST_FUEL_PRICE_KEY, String(halers)); }
 function setFuelPriceFromHalers(halers) {
@@ -1062,7 +1063,8 @@ function buildWheelColumn(colEl, count, formatFn) {
     colEl.appendChild(it);
   }
 }
-function attachWheelColumn(colEl, count, formatFn) {
+function attachWheelColumn(colEl, count, formatFn, valueFn) {
+  valueFn = valueFn || (idx => idx);
   let currentIndex = 0;
   let ticking = false;
   function updateVisual(idx) {
@@ -1071,7 +1073,7 @@ function attachWheelColumn(colEl, count, formatFn) {
       el.classList.toggle('selected', d === 0);
       el.classList.toggle('near', d === 1);
     });
-    colEl.setAttribute('aria-valuenow', String(idx));
+    colEl.setAttribute('aria-valuenow', String(valueFn(idx)));
     colEl.setAttribute('aria-valuetext', formatFn(idx));
   }
   colEl.addEventListener('scroll', () => {
@@ -1108,10 +1110,11 @@ function attachWheelColumn(colEl, count, formatFn) {
   return ctrl;
 }
 
+const fmtHal = i => String(i * 10).padStart(2, '0');
 buildWheelColumn(document.getElementById('wheel-kc'), 100, i => String(i));
-buildWheelColumn(document.getElementById('wheel-hal'), 100, i => String(i).padStart(2, '0'));
+buildWheelColumn(document.getElementById('wheel-hal'), 10, fmtHal);
 const wheelKcCtrl  = attachWheelColumn(document.getElementById('wheel-kc'), 100, i => String(i));
-const wheelHalCtrl = attachWheelColumn(document.getElementById('wheel-hal'), 100, i => String(i).padStart(2, '0'));
+const wheelHalCtrl = attachWheelColumn(document.getElementById('wheel-hal'), 10, fmtHal, i => i * 10);
 setFuelPriceFromHalers(loadLastFuelHalers());
 
 function openFuelPicker() {
@@ -1121,7 +1124,7 @@ function openFuelPicker() {
   document.body.style.overflow = 'hidden';
   requestAnimationFrame(() => {
     wheelKcCtrl.setIndex(Math.floor(halers / 100), false, false);
-    wheelHalCtrl.setIndex(halers % 100, false, false);
+    wheelHalCtrl.setIndex(Math.round((halers % 100) / 10), false, false);
   });
   document.getElementById('wheel-kc').focus();
 }
@@ -1136,7 +1139,7 @@ document.getElementById('fuel-picker-overlay').addEventListener('keydown', e => 
   if (e.key === 'Escape') closeFuelPicker();
 });
 document.getElementById('btn-fuel-done').addEventListener('click', () => {
-  const halers = wheelKcCtrl.getIndex() * 100 + wheelHalCtrl.getIndex();
+  const halers = wheelKcCtrl.getIndex() * 100 + wheelHalCtrl.getIndex() * 10;
   setFuelPriceFromHalers(halers);
   saveLastFuelHalers(halers);
   triggerConfirmHaptic();

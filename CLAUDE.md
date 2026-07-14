@@ -62,10 +62,10 @@ celkem = náklady_rozvoz + náklady_desna
 - Soubor je **single HTML file** — veškerý CSS a JS inline
 - Žádné externí knihovny ani CDN
 - Verze se označuje ve formátu `2026.0.0.x` (rok.major.minor.patch)
-- Aktuální verze: **2026.0.0.4**
+- Aktuální verze: **2026.0.0.5**
 - Desetinná čárka i tečka musí fungovat v číselných inputech (lokalizační problém)
 - Presetová tlačítka spotřeby musí hodnotu přednastavit **automaticky při načtení** (ne až po kliknutí)
-- Cena PHM se zadává přes vlastní wheel picker (bottom sheet, dva sloupce Kč/haléře se scroll-snapem, styl iOS time pickeru); interně se ukládá jako celé haléře, naposledy zadaná hodnota se pamatuje v `localStorage` a je defaultní příště
+- Cena PHM se zadává přes vlastní wheel picker (bottom sheet, dva sloupce se scroll-snapem, styl iOS time pickeru); levý sloupec Kč (0–99, krok 1), pravý sloupec haléře (00–90, **krok 10**); interně se ukládá jako celé haléře, naposledy zadaná hodnota se pamatuje v `localStorage` a je defaultní příště
 
 ---
 
