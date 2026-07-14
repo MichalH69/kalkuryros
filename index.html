@@ -1269,6 +1269,8 @@ document.getElementById('btn-preset-save').addEventListener('click',()=>{
 
 document.querySelectorAll('.preset-btn').forEach(btn => attachPresetBtn(btn));
 renderPresets();
+const activePresetBtn = document.querySelector('.preset-btn.active');
+if (activePresetBtn) consumptionEl.value = activePresetBtn.dataset.value;
 [distanceEl, consumptionEl, directLitersEl].forEach(el => el.addEventListener('input', calculate));
 
 // LOG
