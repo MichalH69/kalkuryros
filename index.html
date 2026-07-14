@@ -68,10 +68,25 @@ input[type="date"], input[type="time"] { color-scheme:dark; }
 .mode-switch-btn.active { background:var(--clr-primary); color:#fff; }
 /* PHM PICKER */
 .phm-row { display:flex; justify-content:space-between; align-items:center; margin:12px 0 4px; }
-.phm-selects { display:flex; align-items:center; gap:4px; }
-.phm-select { background:#1e2130; border:1px solid #2e3240; border-radius:10px; color:var(--clr-primary); font-size:1.1rem; font-weight:700; padding:7px 6px; text-align:center; cursor:pointer; min-width:52px; -webkit-appearance:none; appearance:none; }
-.phm-sep { font-size:1.2rem; font-weight:700; color:#6b7280; padding:0 2px; }
-.phm-unit { font-size:0.78rem; color:#6b7280; margin-left:4px; }
+.phm-box { background:#1e2130; border:1px solid #2e3240; border-radius:10px; color:var(--clr-primary); font-size:1.1rem; font-weight:700; padding:8px 14px; text-align:center; cursor:pointer; min-width:110px; font-family:inherit; }
+.phm-box:focus-visible { outline:2px solid var(--clr-primary); outline-offset:2px; }
+/* WHEEL PICKER SHEET */
+.sheet-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:250; align-items:flex-end; justify-content:center; touch-action:none; }
+.sheet-overlay.open { display:flex; }
+.sheet { background:#1a1d24; width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:14px 18px calc(18px + env(safe-area-inset-bottom, 0px)); animation:sheet-up .22s ease-out; }
+@keyframes sheet-up { from { transform:translateY(100%); } to { transform:translateY(0); } }
+.sheet-handle { width:36px; height:4px; background:#383c47; border-radius:2px; margin:0 auto 12px; }
+.sheet h3 { font-size:1rem; color:#fff; text-align:center; margin-bottom:16px; }
+.wheel-picker { position:relative; display:flex; align-items:center; justify-content:center; height:200px; overscroll-behavior:contain; }
+.wheel-highlight { position:absolute; left:8px; right:8px; top:50%; transform:translateY(-50%); height:40px; background:rgba(79,140,255,.12); border-top:1px solid #2e3240; border-bottom:1px solid #2e3240; border-radius:8px; pointer-events:none; }
+.wheel-col { position:relative; height:200px; width:64px; overflow-y:scroll; scroll-snap-type:y mandatory; overscroll-behavior:contain; touch-action:pan-y; scrollbar-width:none; -ms-overflow-style:none; }
+.wheel-col::-webkit-scrollbar { display:none; }
+.wheel-col:focus-visible { outline:2px solid var(--clr-primary); outline-offset:-2px; border-radius:8px; }
+.wheel-item { height:40px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; font-weight:700; color:#4a5060; scroll-snap-align:center; opacity:.28; user-select:none; }
+.wheel-item.near { opacity:.55; color:#8a93a2; }
+.wheel-item.selected { opacity:1; color:var(--clr-primary); font-size:1.5rem; }
+.wheel-sep, .wheel-unit { font-size:1.3rem; font-weight:700; color:#6b7280; padding:0 4px; }
+.wheel-unit { font-size:0.85rem; margin-left:8px; align-self:center; }
 /* PLATFORM SELECTOR */
 .platform-btns { display:flex; gap:7px; margin-top:6px; }
 .plat-btn { flex:1; padding:8px 4px; border-radius:8px; border:2px solid transparent; font-size:0.8rem; font-weight:700; cursor:pointer; background:#22252e; color:#6b7280; transition:.15s; text-align:center; }
@@ -312,15 +327,9 @@ svg.chart { display:block; }
     </div>
     <div class="phm-row">
       <span class="field-label" style="margin:0;">Cena PHM</span>
-      <div class="phm-selects">
-        <select id="fuel-kc" class="phm-select"></select>
-        <span class="phm-sep">,</span>
-        <select id="fuel-hal" class="phm-select"></select>
-        <span class="phm-unit">Kč/l</span>
-      </div>
+      <button type="button" class="phm-box" id="fuel-price-box" aria-haspopup="dialog">36,50 Kč/l</button>
     </div>
     <input type="hidden" id="fuel-price" value="36.5">
-    <span style="display:none" id="fuel-price-display">36,5</span>
     <div id="fields-km">
       <label class="field-label" for="distance">Vzdálenost rozvozu (km)</label>
       <input type="number" id="distance" step="0.1" placeholder="např. 25" inputmode="decimal">
@@ -439,12 +448,19 @@ svg.chart { display:block; }
       <button class="btn btn-secondary btn-sm" onclick="openHomeRouteModal()">✏️ Upravit trasu</button>
     </div>
   </div>
+  <h2>Přístupnost</h2>
+  <div class="card">
+    <label class="checkbox-row" style="margin-top:0;">
+      <input type="checkbox" id="reduce-motion-toggle">
+      <span>Omezit pohyb a vibrace (haptika)</span>
+    </label>
+  </div>
   <h2>Nebezpečná zóna</h2>
   <div class="card">
     <button class="btn btn-danger" id="btn-clear">🗑 Smazat všechna data</button>
   </div>
   <div class="version-card">
-    <div class="ver">Verze 2026.0.0.3</div>
+    <div class="ver">Verze 2026.0.0.4</div>
     <div class="ver-sub">Rozvoz tracker — osobní aplikace pro sledování výdělků kurýra</div>
     <div class="ver-sub" style="margin-top:6px;">© Herbatronix™ — odnož konglomerátu Raator Industries</div>
   </div>
@@ -489,6 +505,25 @@ svg.chart { display:block; }
     <div class="modal-actions">
       <button class="btn btn-secondary" id="btn-delete-cancel" style="flex:1;">Zrušit</button>
       <button class="btn btn-danger" id="btn-delete-confirm" style="flex:1;">Smazat</button>
+    </div>
+  </div>
+</div>
+
+<!-- FUEL PRICE WHEEL PICKER -->
+<div class="sheet-overlay" id="fuel-picker-overlay" role="dialog" aria-modal="true" aria-label="Cena PHM">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>⛽ Cena PHM</h3>
+    <div class="wheel-picker">
+      <div class="wheel-highlight" aria-hidden="true"></div>
+      <div class="wheel-col" id="wheel-kc" tabindex="0" role="spinbutton" aria-label="Koruny" aria-valuemin="0" aria-valuemax="99"></div>
+      <span class="wheel-sep" aria-hidden="true">,</span>
+      <div class="wheel-col" id="wheel-hal" tabindex="0" role="spinbutton" aria-label="Haléře" aria-valuemin="0" aria-valuemax="99"></div>
+      <span class="wheel-unit" aria-hidden="true">Kč/l</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-fuel-cancel" style="flex:1;">Zrušit</button>
+      <button class="btn btn-primary" id="btn-fuel-done" style="flex:1;">Hotovo</button>
     </div>
   </div>
 </div>
@@ -944,7 +979,6 @@ function initPlatBtns(containerId, defaultPlat, isMainSelector=false) {
 //  KALKULAČKA
 // ══════════════════════════════════════════════════════
 const fuelPriceEl    = document.getElementById('fuel-price');
-const fuelDispEl     = document.getElementById('fuel-price-display');
 const distanceEl     = document.getElementById('distance');
 const consumptionEl  = document.getElementById('consumption');
 const directLitersEl = document.getElementById('direct-liters');
@@ -961,33 +995,154 @@ let logPlatCtrl, editPlatCtrl;
 
 logDateEl.value = todayISO();
 
-// ── PHM SELECT PICKERS ───────────────────────────────
-(function initFuelSelects() {
-  const kcEl  = document.getElementById('fuel-kc');
-  const halEl = document.getElementById('fuel-hal');
-  for (let i = 20; i <= 60; i++) {
-    const o = document.createElement('option');
-    o.value = i; o.textContent = i;
-    kcEl.appendChild(o);
-  }
-  for (let i = 0; i <= 9; i++) {
-    const o = document.createElement('option');
-    o.value = i; o.textContent = i;
-    halEl.appendChild(o);
-  }
-  const cur = parseFloat(fuelPriceEl.value) || 36.5;
-  kcEl.value  = Math.floor(cur);
-  halEl.value = Math.round((cur - Math.floor(cur)) * 10);
-})();
-
-function syncFuelPrice() {
-  const kc  = parseInt(document.getElementById('fuel-kc').value)  || 36;
-  const hal = parseInt(document.getElementById('fuel-hal').value) || 0;
-  fuelPriceEl.value = (kc + hal / 10).toFixed(1);
-  calculate();
+// ── HAPTIC FEEDBACK ──────────────────────────────────
+const REDUCE_MOTION_KEY = 'rozvoz_reduce_motion';
+function getReduceMotion() {
+  try { if (localStorage.getItem(REDUCE_MOTION_KEY) === '1') return true; } catch(e) {}
+  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true; } catch(e) {}
+  return false;
 }
-document.getElementById('fuel-kc').addEventListener('change',  syncFuelPrice);
-document.getElementById('fuel-hal').addEventListener('change', syncFuelPrice);
+function getNativeHaptics() {
+  try {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      return (window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics) || null;
+    }
+  } catch(e) {}
+  return null;
+}
+let lastHapticTime = 0;
+const HAPTIC_MIN_INTERVAL = 60;
+function triggerSelectionHaptic() {
+  if (getReduceMotion()) return;
+  const now = Date.now();
+  if (now - lastHapticTime < HAPTIC_MIN_INTERVAL) return;
+  lastHapticTime = now;
+  const native = getNativeHaptics();
+  try {
+    if (native && typeof native.selectionChanged === 'function') { native.selectionChanged(); return; }
+  } catch(e) {}
+  try { if (navigator.vibrate) navigator.vibrate(4); } catch(e) {}
+}
+function triggerConfirmHaptic() {
+  if (getReduceMotion()) return;
+  const native = getNativeHaptics();
+  try {
+    if (native && typeof native.notification === 'function') { native.notification({ type: 'SUCCESS' }); return; }
+    if (native && typeof native.selectionChanged === 'function') { native.selectionChanged(); return; }
+  } catch(e) {}
+  try { if (navigator.vibrate) navigator.vibrate(8); } catch(e) {}
+}
+
+// ── FUEL PRICE (last used value remembered) ─────────
+const LAST_FUEL_PRICE_KEY = 'rozvoz_last_fuel_price';
+function loadLastFuelHalers() {
+  const n = parseInt(localStorage.getItem(LAST_FUEL_PRICE_KEY), 10);
+  return (!isNaN(n) && n >= 0 && n <= 9999) ? n : 3650;
+}
+function saveLastFuelHalers(halers) { localStorage.setItem(LAST_FUEL_PRICE_KEY, String(halers)); }
+function setFuelPriceFromHalers(halers) {
+  const kc = Math.floor(halers / 100), hal = halers % 100;
+  fuelPriceEl.value = (halers / 100).toFixed(2);
+  document.getElementById('fuel-price-box').textContent = `${kc},${String(hal).padStart(2,'0')} Kč/l`;
+}
+
+// ── WHEEL PICKER ─────────────────────────────────────
+const WHEEL_ITEM_H = 40;
+function buildWheelColumn(colEl, count, formatFn) {
+  colEl.innerHTML = '';
+  const pad = WHEEL_ITEM_H * 2; // 2 rows above/below the centered item
+  colEl.style.paddingTop = pad + 'px';
+  colEl.style.paddingBottom = pad + 'px';
+  for (let i = 0; i < count; i++) {
+    const it = document.createElement('div');
+    it.className = 'wheel-item';
+    it.setAttribute('aria-hidden', 'true');
+    it.textContent = formatFn(i);
+    it.dataset.index = i;
+    colEl.appendChild(it);
+  }
+}
+function attachWheelColumn(colEl, count, formatFn) {
+  let currentIndex = 0;
+  let ticking = false;
+  function updateVisual(idx) {
+    colEl.querySelectorAll('.wheel-item').forEach(el => {
+      const d = Math.abs(parseInt(el.dataset.index, 10) - idx);
+      el.classList.toggle('selected', d === 0);
+      el.classList.toggle('near', d === 1);
+    });
+    colEl.setAttribute('aria-valuenow', String(idx));
+    colEl.setAttribute('aria-valuetext', formatFn(idx));
+  }
+  colEl.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      let idx = Math.round(colEl.scrollTop / WHEEL_ITEM_H);
+      idx = Math.max(0, Math.min(count - 1, idx));
+      if (idx !== currentIndex) {
+        currentIndex = idx;
+        updateVisual(idx);
+        triggerSelectionHaptic();
+      }
+      ticking = false;
+    });
+  }, { passive: true });
+  colEl.addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp')       { e.preventDefault(); ctrl.setIndex(currentIndex - 1, true, true); }
+    else if (e.key === 'ArrowDown'){ e.preventDefault(); ctrl.setIndex(currentIndex + 1, true, true); }
+    else if (e.key === 'Home')     { e.preventDefault(); ctrl.setIndex(0, true, true); }
+    else if (e.key === 'End')      { e.preventDefault(); ctrl.setIndex(count - 1, true, true); }
+  });
+  const ctrl = {
+    setIndex(idx, animate, notify) {
+      idx = Math.max(0, Math.min(count - 1, idx));
+      const changed = idx !== currentIndex;
+      currentIndex = idx;
+      colEl.scrollTo({ top: idx * WHEEL_ITEM_H, behavior: animate ? 'smooth' : 'auto' });
+      updateVisual(idx);
+      if (notify && changed) triggerSelectionHaptic();
+    },
+    getIndex: () => currentIndex
+  };
+  return ctrl;
+}
+
+buildWheelColumn(document.getElementById('wheel-kc'), 100, i => String(i));
+buildWheelColumn(document.getElementById('wheel-hal'), 100, i => String(i).padStart(2, '0'));
+const wheelKcCtrl  = attachWheelColumn(document.getElementById('wheel-kc'), 100, i => String(i));
+const wheelHalCtrl = attachWheelColumn(document.getElementById('wheel-hal'), 100, i => String(i).padStart(2, '0'));
+setFuelPriceFromHalers(loadLastFuelHalers());
+
+function openFuelPicker() {
+  let halers = Math.round(parseFloat(fuelPriceEl.value) * 100);
+  if (isNaN(halers)) halers = loadLastFuelHalers();
+  document.getElementById('fuel-picker-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => {
+    wheelKcCtrl.setIndex(Math.floor(halers / 100), false, false);
+    wheelHalCtrl.setIndex(halers % 100, false, false);
+  });
+  document.getElementById('wheel-kc').focus();
+}
+function closeFuelPicker() {
+  document.getElementById('fuel-picker-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  document.getElementById('fuel-price-box').focus();
+}
+document.getElementById('fuel-price-box').addEventListener('click', openFuelPicker);
+document.getElementById('btn-fuel-cancel').addEventListener('click', closeFuelPicker);
+document.getElementById('fuel-picker-overlay').addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeFuelPicker();
+});
+document.getElementById('btn-fuel-done').addEventListener('click', () => {
+  const halers = wheelKcCtrl.getIndex() * 100 + wheelHalCtrl.getIndex();
+  setFuelPriceFromHalers(halers);
+  saveLastFuelHalers(halers);
+  triggerConfirmHaptic();
+  closeFuelPicker();
+  calculate();
+});
 
 document.getElementById('mode-km').addEventListener('click', () => {
   calcMode='km';
@@ -1012,7 +1167,7 @@ function calculate() {
     const liters = parseFloat(directLitersEl.value);
     if (isNaN(price)||isNaN(liters)) { reset(); return; }
     const totalCost = liters*price;
-    const detail = `${liters.toFixed(2)} l × ${price.toFixed(1)} Kč/l`;
+    const detail = `${liters.toFixed(2)} l × ${price.toFixed(2)} Kč/l`;
     resultTotalEl.textContent = fmtKc(totalCost);
     resultDetailEl.textContent = detail;
     calcResult = { totalCost, homeCost:0, fuelPrice:price, liters, detail, kmCity: 0 };
@@ -1248,7 +1403,7 @@ function buildDayCard(entry) {
       ` : `<div class="detail-row"><span>⏱ Čas práce</span><span style="color:#4a5060;">nezadán</span></div>`}
       <div class="detail-row"><span>🛣 Nájezd ve městě</span><span>${entry.kmCity ? entry.kmCity+' km' : '–'}</span></div>
       ${effectiveHomeCost > 0 ? `<div class="detail-row"><span>🏠 Cesta z domu</span><span>-${fmtKc(effectiveHomeCost)}</span></div>` : ''}
-      ${entry.fuelPrice ? `<div class="detail-row"><span>⛽ Cena PHM</span><span>${entry.fuelPrice.toFixed(1).replace('.',',')} Kč/l</span></div>` : ''}
+      ${entry.fuelPrice ? `<div class="detail-row"><span>⛽ Cena PHM</span><span>${entry.fuelPrice.toFixed(2).replace('.',',')} Kč/l</span></div>` : ''}
       ${entry.liters ? `<div class="detail-row"><span>🪣 Spáleno</span><span>${entry.liters.toFixed(2).replace('.',',')} l</span></div>` : ''}
       ${entry.note ? `<div class="detail-row"><span>📝 Poznámka</span><span>${entry.note}</span></div>` : ''}
       ${entry.retrofitted ? `<div class="detail-row"><span>🔄 Data</span><span style="color:#4a5060;">retrofitováno</span></div>` : ''}
@@ -1633,6 +1788,7 @@ function renderSettings() {
     : 'Žádná záloha dosud nebyla exportována.';
   updateAuthUI();
   renderHomeRouteSettings();
+  document.getElementById('reduce-motion-toggle').checked = localStorage.getItem(REDUCE_MOTION_KEY) === '1';
 }
 
 function checkBackupWarning() {
@@ -1663,6 +1819,9 @@ document.getElementById('file-import').addEventListener('change',e=>{
     } catch { showToast('❌ Chyba při importu',true); }
   };
   reader.readAsText(file); e.target.value='';
+});
+document.getElementById('reduce-motion-toggle').addEventListener('change', e => {
+  localStorage.setItem(REDUCE_MOTION_KEY, e.target.checked ? '1' : '0');
 });
 document.getElementById('btn-clear').addEventListener('click',()=>{
   if (!confirm('Opravdu smazat VŠECHNA data?')) return;
